@@ -9,58 +9,42 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, ShieldAlert, ClipboardList, Building2 } from "lucide-react";
+import HeroMedia from "@/components/landing/hero-media";
 
 export default function Home() {
   return (
     <main className="min-h-[calc(100svh-56px)]">
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(1200px_400px_at_50%_-40%,theme(colors.primary/10%),transparent)]" />
-        <div className="max-w-6xl mx-auto px-4 py-16 md:py-24">
-          <div className="grid gap-8 md:grid-cols-2 md:gap-12 items-center">
+      <section className="relative min-h-[calc(100svh-56px)] overflow-hidden flex items-center">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(1400px_500px_at_50%_-20%,theme(colors.primary/12%),transparent)]" />
+        <div className="pointer-events-none absolute -inset-x-20 -bottom-10 -z-10 h-56 bg-[radial-gradient(600px_120px_at_70%_60%,theme(colors.primary/15%),transparent)] blur-2xl" />
+        <div className="max-w-6xl mx-auto px-4 py-16 w-full">
+          <div className="grid items-center gap-10 md:grid-cols-2">
+            {/* Left: sales-focused copy */}
             <div className="space-y-6">
               <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
-                Inteligencia para licitaciones, sin dolor.
+                Gana tiempo y control en cada licitación
               </h1>
               <p className="text-muted-foreground text-base md:text-lg">
-                IAN lee pliegos, propuestas y contratos, clasifica secciones
-                clave, detecta vacíos y riesgos, y compara oferentes con señales
-                claras. Menos errores, más control y velocidad.
+                Analiza pliegos, propuestas y contratos con precisión. Reduce
+                hasta un 60% el tiempo de revisión, evita riesgos costosos y
+                toma decisiones con datos claros.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
-                <SignUpButton
-                  mode="modal"
-                  forceRedirectUrl="/dashboard"
-                  fallbackRedirectUrl="/dashboard"
-                >
-                  <Button size="lg">Crear cuenta</Button>
+                <SignUpButton mode="modal">
+                  <Button size="lg">Empezar gratis</Button>
                 </SignUpButton>
-                <SignInButton
-                  mode="modal"
-                  forceRedirectUrl="/dashboard"
-                  fallbackRedirectUrl="/dashboard"
-                >
+                <SignInButton mode="modal">
                   <Button size="lg" variant="outline">
-                    Entrar
+                    Ver demo
                   </Button>
                 </SignInButton>
               </div>
+              <p className="text-xs text-muted-foreground">
+                14 días gratis · Sin tarjeta · Cancela cuando quieras
+              </p>
             </div>
-            <div className="relative">
-              <div className="aspect-[4/3] rounded-xl border bg-card p-6 shadow-sm">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-lg h-28 bg-primary/10 border" />
-                  <div className="rounded-lg h-28 bg-accent border" />
-                  <div className="rounded-lg h-28 bg-muted border" />
-                  <div className="col-span-3 h-28 rounded-lg border bg-background" />
-                  <div className="col-span-2 h-10 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                    Semáforo de riesgos
-                  </div>
-                  <div className="h-10 rounded-md border flex items-center justify-center text-sm">
-                    Comparativo
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Right: interactive media with glow */}
+            <HeroMedia />
           </div>
         </div>
       </section>
@@ -171,18 +155,10 @@ export default function Home() {
             </Card>
           </div>
           <div className="mt-10 flex gap-3">
-            <SignUpButton
-              mode="modal"
-              forceRedirectUrl="/dashboard"
-              fallbackRedirectUrl="/dashboard"
-            >
+            <SignUpButton mode="modal">
               <Button size="lg">Empezar gratis</Button>
             </SignUpButton>
-            <SignInButton
-              mode="modal"
-              forceRedirectUrl="/dashboard"
-              fallbackRedirectUrl="/dashboard"
-            >
+            <SignInButton mode="modal">
               <Button size="lg" variant="outline">
                 Ver demo con datos
               </Button>
