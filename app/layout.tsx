@@ -49,22 +49,12 @@ export default function RootLayout({
               </a>
               <nav className="flex items-center gap-2">
                 <SignedOut>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/dashboard"
-                    fallbackRedirectUrl="/dashboard"
-                    signUpForceRedirectUrl="/dashboard"
-                    signUpFallbackRedirectUrl="/dashboard"
-                  >
+                  <SignInButton mode="modal">
                     <Button variant="outline" size="sm">
                       Entrar
                     </Button>
                   </SignInButton>
-                  <SignUpButton
-                    mode="modal"
-                    forceRedirectUrl="/dashboard"
-                    fallbackRedirectUrl="/dashboard"
-                  >
+                  <SignUpButton mode="modal">
                     <Button size="sm">Crear cuenta</Button>
                   </SignUpButton>
                 </SignedOut>
