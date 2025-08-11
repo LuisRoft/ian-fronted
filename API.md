@@ -25,10 +25,15 @@ collection.add(
         "file_name": "pliego.pdf-a1b2c3d4",
         "document_type": "TENDER", # o "PROPOSAL"
         "bidder_name": "Empresa A",
-        "section": "legal_conditions"
+  "section": "legal_conditions",
+  "chunk_number": 12
     }],
     ids=["doc_tender_01_chunk_012"]
 )
+
+Notas:
+- `file_name` corresponde al `document_id` devuelto por el endpoint de carga y es la clave para borrar documentos específicos.
+- `chunk_number` permite recuperar vecinos (±1, ±2) para dar contexto adicional coherente a los LLMs.
 ```
 
 ## 3. Flujo de Proceso Síncrono
@@ -111,7 +116,68 @@ Antes de cargar una propuesta, el frontend debe validar el RUC del proponente.
 - **a. Llama al `agents/orchestrator.py`**.
 - **b. El orquestador ejecuta toda la lógica de comparación:** Usa el `retriever.py` para obtener los datos de ChromaDB y el `comparison_agent.py` para evaluarlos.
 - **c. Ensambla la respuesta JSON** con el formato definido en `schemas/schemas.py`.
-- **d. Devuelve el JSON completo** a la UI para que se muestre el dashboard.
+- **d. Devuelve el JSON completo** a la UI para que se muestre el dashboard. Ahora incluye:
+  - `summary.summary_text`: párrafo + bullets por subtemas.
+  - `summary.by_topics`: desglose por subtemas con `overallScore`, `summary`, `alerts` y `evidence`.
+  - Cada alerta incluye el campo `topic` para ser pintada en la sección correcta.
+
+Ejemplo abreviado de comparación (por oferente):
+
+```json
+{
+  "bidderName": "Empresa A",
+  "documentId": "propuestaA.pdf-1a2b3c4d",
+  "overallScore": 78.5,
+  "summary": {
+    "compliance": "calculated",
+    "summary_text": "Resumen ejecutivo...\n- Legal: ...\n- Técnico: ...",
+    "by_topics": [
+      {
+        "topic": "Precios, costos, formas de pago y condiciones económicas",
+        "overallScore": 75,
+        "summary": { "compliance": "partial", "summary_text": "..." },
+        "alerts": [
+          {
+            "level": "yellow",
+            "area": "Económico",
+            "topic": "Precios...",
+            "message": "Monto inferior... \"forma de pago mensual\""
+          }
+        ],
+        "evidence": {
+          "tender": [
+            {
+              "file_name": "pliego.pdf-a1b2",
+              "chunk_number": 10,
+              "preview": "El contratista deberá..."
+            }
+          ],
+          "proposal": [
+            {
+              "file_name": "propA.pdf-1a2b",
+              "chunk_number": 7,
+              "preview": "Se propone pago mensual..."
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "alerts": [
+    {
+      "level": "red",
+      "area": "Documental",
+      "topic": "Garantías...",
+      "message": "No se encontró contenido..."
+    }
+  ],
+  "ruc_validation": {
+    "isValid": true,
+    "canPerformWork": true,
+    "details": "RUC validado (simulación)."
+  }
+}
+```
 
 ## 4. Definición de Endpoints (API REST)
 
@@ -119,17 +185,49 @@ Esta es la interfaz que el frontend usará.
 
 #### **Utilidades**
 
-- `POST /validate-ruc/{ruc}`
+- `POST /validate-ruc/{ruc}`: Valida un RUC en el SRI.
 
 #### **Proyectos**
 
-- `POST /projects`
-- `DELETE /projects/{projectId}`
+- `POST /projects`: Crea un nuevo proyecto.
+- `DELETE /projects/{projectId}`: Elimina un proyecto completo con todos sus datos.
 
 #### **Documentos**
 
-- `POST /projects/{projectId}/documents`
+- `POST /projects/{projectId}/documents`: Sube uno o más documentos (pliego o propuesta) a un proyecto.
+- `DELETE /projects/{projectId}/documents/{documentId}`: Elimina un documento específico y todos sus fragmentos de un proyecto.
+  - `documentId` es el valor devuelto en `document_id` al subir (se almacena como `file_name` en los metadatos de ChromaDB).
+  - Reglas:
+    - Documentos `TENDER`: no requieren `bidderName`.
+    - Documentos `PROPOSAL`: requieren `bidderName` (query param) y debe coincidir con el dueño del documento.
+  - Respuestas: `204 No Content` si se elimina o si ya no existe (idempotente). `400` si falta `bidderName` para `PROPOSAL`. `404` si el documento no existe o el `bidderName` no coincide.
+- `DELETE /projects/{projectId}/bidders/{bidderName}`: Elimina todos los documentos asociados a un oferente específico en un proyecto.
 
 #### **Dashboard**
 
-- `GET /projects/{projectId}/comparison`
+- `GET /projects/{projectId}/comparison`: Dispara el análisis y devuelve el informe comparativo.
+
+## 5. Recuperación (RAG) y Precisión — Cómo logramos respuestas más fiables
+
+- Recuperación con diversidad: se usa MMR por defecto para evitar redundancia y cubrir distintas facetas del tema.
+- Coherencia de contexto: se añaden chunks vecinos (±1 por defecto) del mismo documento usando `chunk_number`.
+- Re-ranking heurístico: tras recuperar, se reordena por solapamiento de palabras clave del tópico para priorizar evidencia más pertinente.
+- Filtros precisos: combinación de metadatos con `$and` al buscar (p. ej., `document_type` y `bidder_name`).
+- Tunings por subtema (internos):
+  - Económico: `k=8`, `fetch_k=32`, `neighbor_window=2`.
+  - Sanciones/multas: `strategy=similarity`, `max_distance=0.32`.
+  - Resto: valores por defecto (MMR, vecinos, re-ranking).
+- Guardrails de prompts:
+  - Las alertas deben basarse en evidencia; si la afirmación es decisiva, incluir una cita breve (3–12 palabras) entre comillas.
+  - Si no hay evidencia suficiente, el agente declara la ausencia; no inventa contenido.
+
+## 6. Guía para el Frontend — Cómo pintar la información
+
+- Encabezado: usa `summary.summary_text` (párrafo + bullets) como visión general.
+- Secciones por subtema: recorre `summary.by_topics` y pinta por `topic` con:
+  - `overallScore` del subtema y `summary.summary_text` del subtema.
+  - `alerts` con semáforo (level: red/yellow/green) y el `topic` ya incluido.
+  - Evidencias: mostrar `file_name`, `chunk_number` y un `preview` (140 chars aprox.).
+- Comparación entre oferentes: usa la lista `comparison` que ya viene segmentada por `bidderName` y `documentId`.
+
+Sugerencia UX: permitir expandir cada subtema para ver evidencias y copiar citas rápidas (las entre comillas en los mensajes de alerta) para trazabilidad.

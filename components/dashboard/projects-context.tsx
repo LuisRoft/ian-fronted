@@ -9,6 +9,8 @@ import {
   getComparison,
   validateRuc,
   deleteProjectBackend as apiDeleteProjectBackend,
+  deleteBidder as apiDeleteBidder,
+  deleteDocumentBackend as apiDeleteDocumentBackend,
 } from "@/lib/api";
 
 export type FileMeta = {
@@ -16,6 +18,8 @@ export type FileMeta = {
   name: string;
   size: number;
   lastModified?: number;
+  // When uploaded to backend, this stores the document_id to allow deletions
+  backendDocumentId?: string;
 };
 
 export type Contractor = {
@@ -61,6 +65,13 @@ type ProjectsContextValue = {
     contractorId: string,
     files: File[]
   ) => void;
+  removeContractorLocal: (projectId: string, contractorId: string) => void;
+  deleteBidder: (projectId: string, contractorId: string) => Promise<void>;
+  deleteDocument: (
+    projectId: string,
+    contractorId: string | null,
+    documentId: string
+  ) => Promise<void>;
   // backend sync actions
   ensureBackendProject: (projectId: string) => Promise<string>; // returns project_id
   uploadTender: (projectId: string, file: File) => Promise<void>;
@@ -271,6 +282,20 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           )
         );
       },
+      removeContractorLocal: (projectId: string, contractorId: string) => {
+        setProjects((arr) =>
+          arr.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  contractors: p.contractors.filter(
+                    (c) => c.id !== contractorId
+                  ),
+                }
+              : p
+          )
+        );
+      },
       ensureBackendProject: async (projectId: string) => {
         const proj = projects.find((p) => p.id === projectId);
         if (!proj) throw new Error("Proyecto no encontrado");
@@ -293,11 +318,29 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
             (await apiCreateProject(p!.name)).project_id
           );
         })();
-        await uploadDocuments({
+        const result = await uploadDocuments({
           project_id,
           document_type: "TENDER",
           files: [file],
         });
+        // Attach backendDocumentId to local file meta
+        const doc = result?.[0];
+        if (doc?.document_id) {
+          setProjects((arr) =>
+            arr.map((p) =>
+              p.id === projectId
+                ? {
+                    ...p,
+                    contratanteFiles: p.contratanteFiles.map((fm) =>
+                      fm.name === file.name && !fm.backendDocumentId
+                        ? { ...fm, backendDocumentId: doc.document_id }
+                        : fm
+                    ),
+                  }
+                : p
+            )
+          );
+        }
       },
       uploadTenderBatch: async (projectId: string, files: File[]) => {
         if (!files.length) return;
@@ -308,7 +351,30 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
             (await apiCreateProject(p!.name)).project_id
           );
         })();
-        await uploadDocuments({ project_id, document_type: "TENDER", files });
+        const result = await uploadDocuments({
+          project_id,
+          document_type: "TENDER",
+          files,
+        });
+        // Map backend ids by file_name
+        const map = new Map(
+          (result || []).map((r) => [r.file_name, r] as const)
+        );
+        setProjects((arr) =>
+          arr.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  contratanteFiles: p.contratanteFiles.map((fm) => {
+                    const r = map.get(fm.name);
+                    return r?.document_id && !fm.backendDocumentId
+                      ? { ...fm, backendDocumentId: r.document_id }
+                      : fm;
+                  }),
+                }
+              : p
+          )
+        );
       },
       uploadProposal: async (
         projectId: string,
@@ -324,12 +390,36 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         }
         const project_id =
           p.backend?.project_id || (await apiCreateProject(p.name)).project_id;
-        await uploadDocuments({
+        const result = await uploadDocuments({
           project_id,
           document_type: "PROPOSAL",
           files: [file],
           bidder_name: contractor.embedding_name || contractor.name,
         });
+        const doc = result?.[0];
+        if (doc?.document_id) {
+          setProjects((arr) =>
+            arr.map((p) =>
+              p.id === projectId
+                ? {
+                    ...p,
+                    contractors: p.contractors.map((c) =>
+                      c.id === contractorId
+                        ? {
+                            ...c,
+                            files: c.files.map((fm) =>
+                              fm.name === file.name && !fm.backendDocumentId
+                                ? { ...fm, backendDocumentId: doc.document_id }
+                                : fm
+                            ),
+                          }
+                        : c
+                    ),
+                  }
+                : p
+            )
+          );
+        }
       },
       uploadProposalBatch: async (
         projectId: string,
@@ -346,12 +436,122 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         }
         const project_id =
           p.backend?.project_id || (await apiCreateProject(p.name)).project_id;
-        await uploadDocuments({
+        const result = await uploadDocuments({
           project_id,
           document_type: "PROPOSAL",
           files,
           bidder_name: contractor.embedding_name || contractor.name,
         });
+        const map = new Map(
+          (result || []).map((r) => [r.file_name, r] as const)
+        );
+        setProjects((arr) =>
+          arr.map((pp) =>
+            pp.id === projectId
+              ? {
+                  ...pp,
+                  contractors: pp.contractors.map((c) =>
+                    c.id === contractorId
+                      ? {
+                          ...c,
+                          files: c.files.map((fm) => {
+                            const r = map.get(fm.name);
+                            return r?.document_id && !fm.backendDocumentId
+                              ? { ...fm, backendDocumentId: r.document_id }
+                              : fm;
+                          }),
+                        }
+                      : c
+                  ),
+                }
+              : pp
+          )
+        );
+      },
+      deleteBidder: async (projectId: string, contractorId: string) => {
+        const p = projects.find((px) => px.id === projectId);
+        if (!p) throw new Error("Proyecto no encontrado");
+        const contractor = p.contractors.find((c) => c.id === contractorId);
+        if (!contractor) return;
+        // Remove from UI immediately
+        setProjects((arr) =>
+          arr.map((pp) =>
+            pp.id === projectId
+              ? {
+                  ...pp,
+                  contractors: pp.contractors.filter(
+                    (c) => c.id !== contractorId
+                  ),
+                }
+              : pp
+          )
+        );
+        // Best-effort backend deletion if project exists
+        if (!p.backend?.project_id) return;
+        try {
+          await apiDeleteBidder(
+            p.backend.project_id,
+            contractor.embedding_name || contractor.name
+          );
+        } catch (e) {
+          // If backend errors other than 404, surface info but keep UI removed
+          console.warn("Failed to delete bidder in backend", e);
+        }
+      },
+      deleteDocument: async (
+        projectId: string,
+        contractorId: string | null,
+        documentId: string
+      ) => {
+        const p = projects.find((px) => px.id === projectId);
+        if (!p) throw new Error("Proyecto no encontrado");
+        // Optimistic UI removal
+        setProjects((arr) =>
+          arr.map((pp) => {
+            if (pp.id !== projectId) return pp;
+            if (!contractorId) {
+              return {
+                ...pp,
+                contratanteFiles: pp.contratanteFiles.filter(
+                  (f) =>
+                    f.backendDocumentId !== documentId && f.id !== documentId
+                ),
+              };
+            }
+            return {
+              ...pp,
+              contractors: pp.contractors.map((c) =>
+                c.id === contractorId
+                  ? {
+                      ...c,
+                      files: c.files.filter(
+                        (f) =>
+                          f.backendDocumentId !== documentId &&
+                          f.id !== documentId
+                      ),
+                    }
+                  : c
+              ),
+            };
+          })
+        );
+        if (!p.backend?.project_id) return;
+        // Attempt backend deletion
+        try {
+          let bidderName: string | undefined;
+          if (contractorId) {
+            const contractor = p.contractors.find((c) => c.id === contractorId);
+            bidderName =
+              contractor?.embedding_name || contractor?.name || undefined;
+          }
+          await apiDeleteDocumentBackend(
+            p.backend.project_id,
+            documentId,
+            bidderName
+          );
+        } catch (e) {
+          console.warn("Failed to delete document in backend", e);
+        }
       },
       // Optional: server-side delete (best-effort)
       deleteProjectRemote: async (id: string) => {

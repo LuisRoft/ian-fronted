@@ -11,7 +11,25 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Upload, Loader2, Pencil, Plus, ChevronDown } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Upload,
+  Loader2,
+  Pencil,
+  Plus,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 
 type Props = { id: string };
 
@@ -26,6 +44,9 @@ export default function ProjectWorkspace({ id }: Props) {
     uploadTenderBatch,
     uploadProposalBatch,
     runAnalysis,
+    deleteBidder,
+    deleteDocument,
+    removeContractorLocal,
   } = useProjects();
 
   const project = useMemo(
@@ -71,8 +92,9 @@ export default function ProjectWorkspace({ id }: Props) {
     }
     setUploading(true);
     try {
-      await uploadTenderBatch(project!.id, pdfs);
+      // Optimistic: add locally first so uploadBatch can attach backendDocumentId
       addContratanteFiles(project!.id, pdfs);
+      await uploadTenderBatch(project!.id, pdfs);
       toast.success(`Subidos ${pdfs.length} PDF(s)`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Error al subir";
@@ -101,8 +123,9 @@ export default function ProjectWorkspace({ id }: Props) {
     }
     setUploading(true);
     try {
-      await uploadProposalBatch(project!.id, contractorId, pdfs);
+      // Optimistic: add locally first so uploadBatch can attach backendDocumentId
       addContractorFiles(project!.id, contractorId, pdfs);
+      await uploadProposalBatch(project!.id, contractorId, pdfs);
       toast.success(`Subidos ${pdfs.length} PDF(s)`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Error al subir";
@@ -186,7 +209,46 @@ export default function ProjectWorkspace({ id }: Props) {
                 {project.contratanteFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {project.contratanteFiles.map((f) => (
-                      <FilePill key={f.id} name={f.name} />
+                      <AlertDialog key={f.id}>
+                        <AlertDialogTrigger asChild>
+                          <div>
+                            <FilePill name={f.name} onDelete={() => {}} />
+                          </div>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Eliminar documento
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              ¿Deseas eliminar "{f.name}"? Esta acción no se
+                              puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={async () => {
+                                const backendId = f.backendDocumentId || f.id;
+                                try {
+                                  await deleteDocument(
+                                    project.id,
+                                    null,
+                                    backendId
+                                  );
+                                  toast.success("Documento eliminado");
+                                } catch {
+                                  toast.error(
+                                    "No se pudo eliminar el documento"
+                                  );
+                                }
+                              }}
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     ))}
                   </div>
                 )}
@@ -239,7 +301,46 @@ export default function ProjectWorkspace({ id }: Props) {
                               )}
                             </div>
                           </div>
-                          <div>
+                          <div className="flex items-center gap-2">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                  Eliminar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Eliminar oferente
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    ¿Seguro que deseas eliminar "{c.name}" y
+                                    todos sus documentos? Esta acción no se
+                                    puede deshacer.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>
+                                    Cancelar
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={async () => {
+                                      try {
+                                        await deleteBidder(project.id, c.id);
+                                        toast.success("Oferente eliminado");
+                                      } catch {
+                                        removeContractorLocal(project.id, c.id);
+                                        toast.message(
+                                          "Oferente removido localmente; backend no disponible"
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                             <input
                               id={`contractor-files-${c.id}`}
                               type="file"
@@ -317,7 +418,54 @@ export default function ProjectWorkspace({ id }: Props) {
                           {c.files.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               {c.files.map((f) => (
-                                <FilePill key={f.id} name={f.name} />
+                                <AlertDialog key={f.id}>
+                                  <AlertDialogTrigger asChild>
+                                    <div>
+                                      <FilePill
+                                        name={f.name}
+                                        onDelete={() => {}}
+                                      />
+                                    </div>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Eliminar documento
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        ¿Deseas eliminar "{f.name}" de {c.name}?
+                                        Esta acción no se puede deshacer.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancelar
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={async () => {
+                                          const backendId =
+                                            f.backendDocumentId || f.id;
+                                          try {
+                                            await deleteDocument(
+                                              project.id,
+                                              c.id,
+                                              backendId
+                                            );
+                                            toast.success(
+                                              "Documento eliminado"
+                                            );
+                                          } catch {
+                                            toast.error(
+                                              "No se pudo eliminar el documento"
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               ))}
                             </div>
                           )}
@@ -750,10 +898,25 @@ function AddContractorControls({
   );
 }
 
-function FilePill({ name }: { name: string }) {
+function FilePill({
+  name,
+  onDelete,
+}: {
+  name: string;
+  onDelete?: () => void | Promise<void>;
+}) {
   return (
-    <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-1 text-xs">
-      {name}
+    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/40 pl-2 pr-1 py-1 text-xs">
+      <span className="truncate max-w-[200px]" title={name}>
+        {name}
+      </span>
+      <button
+        type="button"
+        title="Eliminar"
+        className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted focus:outline-none"
+      >
+        <Trash2 className="size-3.5 text-muted-foreground" />
+      </button>
     </span>
   );
 }

@@ -139,6 +139,56 @@ export async function deleteProjectBackend(project_id: string): Promise<void> {
   }
 }
 
+// DELETE all documents for a bidder in a project. Treat 404 as success (idempotent UX).
+export async function deleteBidder(
+  project_id: string,
+  bidder_name: string
+): Promise<void> {
+  const res = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(
+      project_id
+    )}/bidders/${encodeURIComponent(bidder_name)}`,
+    {
+      method: "DELETE",
+    }
+  );
+  if (res.status === 404) return; // allow removing even if no docs existed
+  if (!res.ok) {
+    const err: HttpError = Object.assign(new Error(`HTTP ${res.status}`), {
+      status: res.status as number,
+    });
+    try {
+      err.body = (await res.json()) as unknown;
+    } catch {}
+    throw err;
+  }
+}
+
+// DELETE a specific document. Optionally include bidder_name for PROPOSAL docs.
+export async function deleteDocumentBackend(
+  project_id: string,
+  document_id: string,
+  bidder_name?: string
+): Promise<void> {
+  const url = new URL(
+    `${BASE_URL}/projects/${encodeURIComponent(
+      project_id
+    )}/documents/${encodeURIComponent(document_id)}`
+  );
+  if (bidder_name) url.searchParams.set("bidderName", bidder_name);
+  const res = await fetch(url.toString(), { method: "DELETE" });
+  if (res.status === 404) return; // be lenient (already deleted or mismatch handled server-side)
+  if (!res.ok) {
+    const err: HttpError = Object.assign(new Error(`HTTP ${res.status}`), {
+      status: res.status as number,
+    });
+    try {
+      err.body = (await res.json()) as unknown;
+    } catch {}
+    throw err;
+  }
+}
+
 export async function validateRuc(ruc: string): Promise<RucValidationResponse> {
   const res = await fetch(
     `${BASE_URL}/validate-ruc/${encodeURIComponent(ruc)}`,
