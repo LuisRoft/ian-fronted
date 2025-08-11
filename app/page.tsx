@@ -1,4 +1,5 @@
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,8 +11,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { FileText, ShieldAlert, ClipboardList, Building2 } from "lucide-react";
 import HeroMedia from "@/components/landing/hero-media";
+import Link from "next/link";
 
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
   return (
     <main className="min-h-[calc(100svh-56px)]">
       <section className="relative min-h-[calc(100svh-56px)] overflow-hidden flex items-center">
@@ -30,14 +33,22 @@ export default function Home() {
                 toma decisiones con datos claros.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
-                <SignUpButton mode="modal">
-                  <Button size="lg">Empezar gratis</Button>
-                </SignUpButton>
-                <SignInButton mode="modal">
-                  <Button size="lg" variant="outline">
-                    Ver demo
-                  </Button>
-                </SignInButton>
+                {userId ? (
+                  <Link href="/dashboard">
+                    <Button size="lg">Ir al Dashboard</Button>
+                  </Link>
+                ) : (
+                  <>
+                    <SignUpButton mode="modal">
+                      <Button size="lg">Empezar gratis</Button>
+                    </SignUpButton>
+                    <SignInButton mode="modal">
+                      <Button size="lg" variant="outline">
+                        Ver demo
+                      </Button>
+                    </SignInButton>
+                  </>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 14 días gratis · Sin tarjeta · Cancela cuando quieras
@@ -155,14 +166,22 @@ export default function Home() {
             </Card>
           </div>
           <div className="mt-10 flex gap-3">
-            <SignUpButton mode="modal">
-              <Button size="lg">Empezar gratis</Button>
-            </SignUpButton>
-            <SignInButton mode="modal">
-              <Button size="lg" variant="outline">
-                Ver demo con datos
-              </Button>
-            </SignInButton>
+            {userId ? (
+              <Link href="/dashboard">
+                <Button size="lg">Ir al Dashboard</Button>
+              </Link>
+            ) : (
+              <>
+                <SignUpButton mode="modal">
+                  <Button size="lg">Empezar gratis</Button>
+                </SignUpButton>
+                <SignInButton mode="modal">
+                  <Button size="lg" variant="outline">
+                    Ver demo con datos
+                  </Button>
+                </SignInButton>
+              </>
+            )}
           </div>
         </div>
       </section>
