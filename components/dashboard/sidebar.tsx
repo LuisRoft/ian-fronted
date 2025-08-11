@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useProjects } from "@/components/dashboard/projects-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Folder, Trash2 } from "lucide-react";
+import { Plus, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Sidebar({
@@ -14,7 +14,7 @@ export default function Sidebar({
   activeId?: string;
   onSelect: (id: string) => void;
 }) {
-  const { projects, createProject, deleteProject } = useProjects();
+  const { projects, createProject } = useProjects();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
@@ -24,9 +24,9 @@ export default function Sidebar({
         {creating ? (
           <form
             className="flex gap-2"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              const p = createProject(name);
+              const p = await createProject(name);
               setName("");
               setCreating(false);
               onSelect(p.id);
@@ -69,17 +69,6 @@ export default function Sidebar({
                 <Folder className="size-4 text-muted-foreground" />
                 <span className="truncate">{p.name}</span>
               </div>
-              <button
-                className="opacity-0 group-hover:opacity-100 transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteProject(p.id);
-                }}
-                aria-label="Eliminar proyecto"
-                title="Eliminar"
-              >
-                <Trash2 className="size-4 text-muted-foreground" />
-              </button>
             </div>
           ))
         )}

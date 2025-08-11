@@ -9,6 +9,7 @@ import {
 } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -30,13 +31,13 @@ export default function Header() {
       }
     >
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2 font-semibold">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
           <span
             className="inline-block h-6 w-6 rounded-md bg-primary"
             aria-hidden
           />
           IAN
-        </a>
+        </Link>
         <nav className="flex items-center gap-2">
           <SignedOut>
             <SignInButton mode="modal">
