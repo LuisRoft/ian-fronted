@@ -98,7 +98,7 @@ export default function Sidebar({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Eliminar proyecto</AlertDialogTitle>
                     <AlertDialogDescription>
-                      ¿Deseas eliminar "{p.name}" y todo su contenido? Se
+                      ¿Deseas eliminar &quot;{p.name}&quot; y todo su contenido? Se
                       eliminará el workspace en el backend (ChromaDB
                       collection). Esta acción no se puede deshacer.
                     </AlertDialogDescription>

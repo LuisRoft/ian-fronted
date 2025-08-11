@@ -223,7 +223,7 @@ export default function ProjectWorkspace({ id }: Props) {
                               Eliminar documento
                             </AlertDialogTitle>
                             <AlertDialogDescription>
-                              ¿Deseas eliminar "{f.name}"? Esta acción no se
+                              ¿Deseas eliminar &quot;{f.name}&quot;? Esta acción no se
                               puede deshacer.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
@@ -316,7 +316,7 @@ export default function ProjectWorkspace({ id }: Props) {
                                     Eliminar oferente
                                   </AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    ¿Seguro que deseas eliminar "{c.name}" y
+                                    ¿Seguro que deseas eliminar &quot;{c.name}&quot; y
                                     todos sus documentos? Esta acción no se
                                     puede deshacer.
                                   </AlertDialogDescription>
@@ -435,7 +435,7 @@ export default function ProjectWorkspace({ id }: Props) {
                                         Eliminar documento
                                       </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        ¿Deseas eliminar "{f.name}" de {c.name}?
+                                        ¿Deseas eliminar &quot;{f.name}&quot; de {c.name}?
                                         Esta acción no se puede deshacer.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
@@ -1090,7 +1090,7 @@ function AddContractorControls({
   onAddByRuc,
 }: {
   onAddByName: (name: string) => void;
-  onAddByRuc: (ruc: string) => Promise<any>;
+  onAddByRuc: (ruc: string) => Promise<unknown>;
 }) {
   const [name, setName] = useState("");
   const [ruc, setRuc] = useState("");
@@ -1158,6 +1158,7 @@ function FilePill({
         type="button"
         title="Eliminar"
         className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted focus:outline-none"
+  onClick={onDelete}
       >
         <Trash2 className="size-3.5 text-muted-foreground" />
       </button>
