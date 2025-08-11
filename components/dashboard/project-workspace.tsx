@@ -1,552 +1,760 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  useProjects,
-  type Project,
-} from "@/components/dashboard/projects-context";
+import { useMemo, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useProjects } from "@/components/dashboard/projects-context";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Pencil, ChevronDown, Trash } from "lucide-react";
-import type { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Upload, Loader2, Pencil, Plus, ChevronDown } from "lucide-react";
 
-function FilePill({ name }: { name: string }) {
-  return (
-    <span className="inline-flex items-center rounded-md border px-2 py-1 text-xs">
-      {name}
-    </span>
-  );
-}
+type Props = { id: string };
 
-export default function ProjectWorkspace({ id }: { id: string }) {
+export default function ProjectWorkspace({ id }: Props) {
   const {
     projects,
     addContratanteFiles,
-    // addContractor,
+    addContractor,
     addContractorByRuc,
-    addContractorFiles,
     renameContractor,
+    addContractorFiles,
     uploadTenderBatch,
     uploadProposalBatch,
     runAnalysis,
-    deleteProject,
-    deleteProjectRemote,
   } = useProjects();
 
-  const project = useMemo<Project | undefined>(
+  const project = useMemo(
     () => projects.find((p) => p.id === id),
     [projects, id]
   );
-  // const [newContractor, setNewContractor] = useState("");
-  const [newRuc, setNewRuc] = useState("");
-  const [validatingRuc, setValidatingRuc] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedBidderId, setSelectedBidderId] = useState<string | undefined>(
+    undefined
+  );
 
-  if (!project)
+  if (!project) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
-        Selecciona o crea un proyecto.
-      </div>
-    );
-
-  return (
-    <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold truncate">{project.name}</h2>
-        <Button
-          size="sm"
-          variant="outline"
-          className="text-red-600 border-red-300 hover:bg-red-50"
-          disabled={deleting}
-          onClick={() => setConfirmOpen(true)}
-        >
-          {deleting ? (
-            "Eliminando..."
-          ) : (
-            <span className="inline-flex items-center gap-1">
-              <Trash className="size-4" /> Eliminar proyecto
-            </span>
-          )}
-        </Button>
-      </div>
-
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar proyecto</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminará &quot;{project.name}&quot;. Intentaremos borrar sus
-              datos en el backend. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
-              disabled={deleting}
-              onClick={async () => {
-                try {
-                  setDeleting(true);
-                  await deleteProjectRemote?.(project.id);
-                  toast.success("Proyecto eliminado");
-                } catch {
-                } finally {
-                  deleteProject(project.id);
-                  setDeleting(false);
-                }
-              }}
-            >
-              {deleting ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Contratante */}
+      <div className="p-4">
         <Card>
           <CardHeader>
-            <CardTitle>Documentos del contratante</CardTitle>
+            <CardTitle>Selecciona un proyecto</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label htmlFor="contratante-files">Subir PDFs</Label>
-              <div className="mt-1 flex items-center gap-2">
+          <CardContent className="text-sm text-muted-foreground">
+            Elige un proyecto en la barra lateral o crea uno nuevo.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Preconditions for running analysis: need tender files and at least one contractor with files
+  const hasTender = (project.contratanteFiles?.length || 0) > 0;
+  const hasBidderWithFiles =
+    project.contractors?.some((c) => (c.files?.length || 0) > 0) || false;
+  const canAnalyze = hasTender && hasBidderWithFiles;
+
+  async function handleTenderFiles(files: File[]) {
+    const pdfs = files.filter((f) => f.type === "application/pdf");
+    if (!pdfs.length) {
+      toast.error("Selecciona archivos PDF");
+      return;
+    }
+    if (uploading) {
+      toast.warning("Subida en curso. Espera a que termine.");
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadTenderBatch(project!.id, pdfs);
+      addContratanteFiles(project!.id, pdfs);
+      toast.success(`Subidos ${pdfs.length} PDF(s)`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al subir";
+      toast.error(msg);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleProposalFiles(contractorId: string, files: File[]) {
+    const pdfs = files.filter((f) => f.type === "application/pdf");
+    if (!pdfs.length) {
+      toast.error("Selecciona archivos PDF");
+      return;
+    }
+    if (uploading) {
+      toast.warning("Subida en curso. Espera a que termine.");
+      return;
+    }
+    // contractor status check
+    const c = project!.contractors.find((x) => x.id === contractorId);
+    const status = (c?.estado || "").toUpperCase();
+    if (status && status !== "ACTIVO") {
+      toast.error("Contratista no habilitado para subir documentos");
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadProposalBatch(project!.id, contractorId, pdfs);
+      addContractorFiles(project!.id, contractorId, pdfs);
+      toast.success(`Subidos ${pdfs.length} PDF(s)`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al subir";
+      toast.error(msg);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="p-4">
+      <Tabs defaultValue="stage1" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="stage1">
+            Etapa 1: Análisis de documentos
+          </TabsTrigger>
+          <TabsTrigger value="stage2">
+            Etapa 2: Proceso de contratación
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Etapa 1 */}
+        <TabsContent value="stage1" className="mt-2">
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Entidad contratante + Oferentes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Entidad contratante</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <input
-                  id="contratante-files"
+                  id="tender-files"
                   type="file"
                   accept="application/pdf"
                   multiple
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
-                    if (files.length) {
-                      addContratanteFiles(project.id, files);
-                      uploadTenderBatch(project.id, files).catch(() => {});
-                    }
                     e.currentTarget.value = "";
+                    await handleTenderFiles(files);
                   }}
                 />
-                <Button asChild size="sm" variant="outline">
-                  <label
-                    htmlFor="contratante-files"
-                    className="cursor-pointer inline-flex items-center gap-2"
-                  >
-                    <Upload className="size-4" /> Seleccionar PDFs
-                  </label>
-                </Button>
-              </div>
-            </div>
-            {project.contratanteFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {project.contratanteFiles.map((f) => (
-                  <FilePill key={f.id} name={f.name} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-disabled={uploading}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      if (!uploading)
+                        document.getElementById("tender-files")?.click();
+                    }
+                  }}
+                  onClick={() => {
+                    if (!uploading)
+                      document.getElementById("tender-files")?.click();
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    if (uploading) return;
+                    const files = Array.from(e.dataTransfer.files || []);
+                    await handleTenderFiles(files);
+                  }}
+                  className={cn(
+                    "flex min-h-24 items-center justify-center gap-2 rounded-md border border-dashed px-3 py-6 text-sm",
+                    uploading && "opacity-60 pointer-events-none"
+                  )}
+                >
+                  {uploading ? (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" /> Subiendo…
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2">
+                      <Upload className="size-4" /> Subir o arrastrar Pliego
+                      (PDF)
+                    </span>
+                  )}
+                </div>
 
-        {/* Contratistas */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold">Contratistas</h3>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="RUC (13 dígitos)"
-                value={newRuc}
-                onChange={(e) => setNewRuc(e.target.value)}
-                className="h-8 w-52"
-                inputMode="numeric"
-                maxLength={13}
-              />
-              <Button
-                size="sm"
-                disabled={validatingRuc || newRuc.trim().length !== 13}
-                onClick={async () => {
-                  try {
-                    setValidatingRuc(true);
-                    await addContractorByRuc(project.id, newRuc);
-                    setNewRuc("");
-                  } catch {
-                  } finally {
-                    setValidatingRuc(false);
-                  }
-                }}
-              >
-                {validatingRuc ? (
-                  "Validando..."
-                ) : (
-                  <>
-                    <Plus className="size-4 mr-1" /> Agregar
-                  </>
+                {project.contratanteFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {project.contratanteFiles.map((f) => (
+                      <FilePill key={f.id} name={f.name} />
+                    ))}
+                  </div>
                 )}
-              </Button>
-            </div>
-          </div>
+              </CardContent>
+            </Card>
 
-          {project.contractors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Agrega contratistas y sube sus PDFs.
-            </p>
-          ) : (
-            <div className="grid gap-3">
-              {project.contractors.map((c) => {
-                const status = (c.estado || "").toUpperCase();
-                const disabled = status && status !== "ACTIVO";
-                return (
-                  <Card key={c.id} className={cn(disabled && "border-red-300")}>
-                    <CardHeader className="flex-row items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Pencil className="size-4 text-muted-foreground" />
-                        <div className="flex items-center gap-2">
-                          <EditableText
-                            value={c.name}
-                            onChange={(name) =>
-                              renameContractor(project.id, c.id, name)
-                            }
-                          />
-                          {c.estado && (
-                            <span
+            <Card>
+              <CardHeader>
+                <CardTitle>Oferentes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add by RUC */}
+                <AddContractorControls
+                  onAddByName={(name) => addContractor(project.id, name)}
+                  onAddByRuc={(ruc) => addContractorByRuc(project.id, ruc)}
+                />
+                <div className="grid gap-3">
+                  {project.contractors.map((c) => {
+                    const status = (c.estado || "").toUpperCase();
+                    const disabled = status && status !== "ACTIVO";
+                    return (
+                      <Card
+                        key={c.id}
+                        className={cn(disabled && "border-red-300")}
+                      >
+                        <CardHeader className="flex-row items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Pencil className="size-4 text-muted-foreground" />
+                            <div className="flex items-center gap-2">
+                              <EditableText
+                                value={c.name}
+                                onChange={(name) =>
+                                  renameContractor(project.id, c.id, name)
+                                }
+                              />
+                              {c.estado && (
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs",
+                                    status === "ACTIVO" &&
+                                      "border-green-300 text-green-700",
+                                    status === "INACTIVO" &&
+                                      "border-red-300 text-red-700",
+                                    status === "SUSPENDIDO" &&
+                                      "border-yellow-300 text-yellow-700"
+                                  )}
+                                >
+                                  {status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <input
+                              id={`contractor-files-${c.id}`}
+                              type="file"
+                              accept="application/pdf"
+                              multiple
+                              className="hidden"
+                              onChange={async (e) => {
+                                const files = Array.from(e.target.files || []);
+                                e.currentTarget.value = "";
+                                await handleProposalFiles(c.id, files);
+                              }}
+                            />
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              aria-disabled={uploading || !!disabled}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  if (!uploading && !disabled)
+                                    document
+                                      .getElementById(
+                                        `contractor-files-${c.id}`
+                                      )
+                                      ?.click();
+                                }
+                              }}
+                              onClick={() => {
+                                if (!uploading && !disabled)
+                                  document
+                                    .getElementById(`contractor-files-${c.id}`)
+                                    ?.click();
+                              }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={async (e) => {
+                                e.preventDefault();
+                                if (uploading || disabled) return;
+                                const files = Array.from(
+                                  e.dataTransfer.files || []
+                                );
+                                await handleProposalFiles(c.id, files);
+                              }}
                               className={cn(
-                                "inline-flex items-center rounded-full border px-2 py-0.5 text-xs",
-                                status === "ACTIVO" &&
-                                  "border-green-300 text-green-700",
-                                status === "INACTIVO" &&
-                                  "border-red-300 text-red-700",
-                                status === "SUSPENDIDO" &&
-                                  "border-yellow-300 text-yellow-700"
+                                "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm",
+                                (uploading || disabled) &&
+                                  "opacity-60 pointer-events-none"
                               )}
                             >
-                              {status}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <input
-                          id={`contractor-files-${c.id}`}
-                          type="file"
-                          accept="application/pdf"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (files.length) {
-                              addContractorFiles(project.id, c.id, files);
-                              uploadProposalBatch(
-                                project.id,
-                                c.id,
-                                files
-                              ).catch(() => {});
-                            }
-                            e.currentTarget.value = "";
-                          }}
-                        />
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="outline"
-                          disabled={!!disabled}
-                        >
-                          <label
-                            htmlFor={`contractor-files-${c.id}`}
-                            className={cn(
-                              "cursor-pointer inline-flex items-center gap-2",
-                              disabled && "pointer-events-none opacity-60"
-                            )}
-                          >
-                            <Upload className="size-4" />{" "}
-                            {disabled ? "No permitido" : "Subir PDFs"}
-                          </label>
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                        {c.ruc && <span>RUC: {c.ruc}</span>}
-                        {disabled && c.motivo_cancelacion && (
-                          <span className="text-red-700">
-                            Motivo: {c.motivo_cancelacion}
-                          </span>
-                        )}
-                      </div>
-                      {c.files.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {c.files.map((f) => (
-                            <FilePill key={f.id} name={f.name} />
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Analysis */}
-        <Card className="md:col-span-2">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Resultado del análisis</CardTitle>
-            <Button
-              size="sm"
-              disabled={analyzing}
-              onClick={async () => {
-                try {
-                  setAnalyzing(true);
-                  toast.info("Ejecutando análisis...");
-                  await runAnalysis(project.id);
-                  toast.success("Análisis completado");
-                } catch {
-                  toast.error("No se pudo obtener el análisis");
-                } finally {
-                  setAnalyzing(false);
-                }
-              }}
-            >
-              {analyzing ? "Analizando..." : "Obtener comparación"}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {analyzing ? (
-              <div className="grid md:grid-cols-2 gap-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-32" />
-                ))}
-              </div>
-            ) : project.analysis ? (
-              <div className="space-y-4">
-                <Tabs defaultValue="resumen">
-                  <TabsList>
-                    <TabsTrigger value="resumen">Resumen</TabsTrigger>
-                    <TabsTrigger value="semaforo">Semaforización</TabsTrigger>
-                    <TabsTrigger value="scores">Scores</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="resumen">
-                    <div className="grid md:grid-cols-2 gap-3 mt-3">
-                      {project.analysis.comparison.map((it) => (
-                        <Card key={it.documentId}>
-                          <CardHeader>
-                            <CardTitle className="text-base">
-                              {it.bidderName}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="space-y-2 text-sm">
-                            {it.summary?.summary_text && (
-                              <p className="text-muted-foreground">
-                                {it.summary.summary_text}
-                              </p>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="semaforo">
-                    <div className="space-y-4">
-                      {(() => {
-                        const allAlerts = project.analysis!.comparison.flatMap(
-                          (c) => c.alerts || []
-                        );
-                        const g = allAlerts.filter(
-                          (a) => a.level === "green"
-                        ).length;
-                        const r = allAlerts.filter(
-                          (a) => a.level === "red"
-                        ).length;
-                        const y = allAlerts.filter(
-                          (a) => a.level === "yellow"
-                        ).length;
-                        return (
-                          <div className="text-sm text-muted-foreground">
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="inline-block h-2 w-2 rounded-full bg-green-500"
-                                aria-hidden
-                              />
-                              Verdes:
-                              <strong className="text-foreground">{g}</strong>
-                            </span>
-                            <span className="mx-3">·</span>
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="inline-block h-2 w-2 rounded-full bg-red-500"
-                                aria-hidden
-                              />
-                              Rojas:
-                              <strong className="text-foreground">{r}</strong>
-                            </span>
-                            <span className="mx-3">·</span>
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="inline-block h-2 w-2 rounded-full bg-yellow-500"
-                                aria-hidden
-                              />
-                              Amarillas:
-                              <strong className="text-foreground">{y}</strong>
-                            </span>
-                          </div>
-                        );
-                      })()}
-
-                      {project.analysis.comparison.map((it) => {
-                        const greens = (it.alerts || []).filter(
-                          (a) => a.level === "green"
-                        );
-                        const reds = (it.alerts || []).filter(
-                          (a) => a.level === "red"
-                        );
-                        const yellows = (it.alerts || []).filter(
-                          (a) => a.level === "yellow"
-                        );
-                        const order = ["green", "red", "yellow"] as const;
-                        const groups = {
-                          green: greens,
-                          red: reds,
-                          yellow: yellows,
-                        } as const;
-                        const counts = {
-                          green: greens.length,
-                          red: reds.length,
-                          yellow: yellows.length,
-                        };
-                        return (
-                          <Card key={it.documentId}>
-                            <CardHeader>
-                              <CardTitle className="text-base flex items-center justify-between gap-3">
-                                <span>{it.bidderName}</span>
-                                <span className="text-xs text-muted-foreground inline-flex items-center gap-3">
-                                  <span className="inline-flex items-center gap-1">
-                                    <span
-                                      className="inline-block h-2 w-2 rounded-full bg-green-500"
-                                      aria-hidden
-                                    />
-                                    {counts.green}
-                                  </span>
-                                  <span className="inline-flex items-center gap-1">
-                                    <span
-                                      className="inline-block h-2 w-2 rounded-full bg-red-500"
-                                      aria-hidden
-                                    />
-                                    {counts.red}
-                                  </span>
-                                  <span className="inline-flex items-center gap-1">
-                                    <span
-                                      className="inline-block h-2 w-2 rounded-full bg-yellow-500"
-                                      aria-hidden
-                                    />
-                                    {counts.yellow}
-                                  </span>
+                              {uploading ? (
+                                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="size-4 animate-spin" />{" "}
+                                  Subiendo…
                                 </span>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-5">
-                              {(it.alerts?.length || 0) === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                  Sin alertas.
-                                </p>
+                              ) : disabled ? (
+                                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                  <Upload className="size-4" /> No permitido
+                                </span>
                               ) : (
-                                order.map(
-                                  (lvl) =>
-                                    groups[lvl].length > 0 && (
-                                      <CollapsibleSection
-                                        key={lvl}
-                                        title={
-                                          lvl === "green"
-                                            ? "Verdes"
-                                            : lvl === "red"
-                                            ? "Rojas"
-                                            : "Amarillas"
-                                        }
-                                        color={lvl}
-                                        count={groups[lvl].length}
-                                        defaultOpen={
-                                          lvl !== "green" &&
-                                          lvl !== "red" &&
-                                          lvl !== "yellow"
-                                        }
-                                      >
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                          {groups[lvl].map((a, idx) => (
-                                            <div
-                                              key={idx}
-                                              className={cn(
-                                                "rounded-md border bg-muted/40 p-3 text-sm hover:shadow-sm transition",
-                                                lvl === "green" &&
-                                                  "border-l-4 border-l-green-500",
-                                                lvl === "red" &&
-                                                  "border-l-4 border-l-red-500",
-                                                lvl === "yellow" &&
-                                                  "border-l-4 border-l-yellow-500"
-                                              )}
-                                              title={`${a.area} — ${a.topic}`}
-                                            >
-                                              <div className="text-xs text-muted-foreground mb-1">
-                                                {a.area} — {a.topic}
-                                              </div>
-                                              <div className="text-foreground line-clamp-3">
-                                                {a.message}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </CollapsibleSection>
-                                    )
-                                )
+                                <span className="inline-flex items-center gap-2">
+                                  <Upload className="size-4" /> Subir o
+                                  arrastrar PDFs
+                                </span>
                               )}
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="scores">
-                    <div className="grid md:grid-cols-2 gap-3">
-                      {project.analysis.comparison.map((it) => (
-                        <Card key={it.documentId}>
-                          <CardHeader>
-                            <CardTitle className="text-base flex items-center justify-between">
-                              <span>{it.bidderName}</span>
-                              <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-                                {Math.round(it.overallScore)}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                            {c.ruc && <span>RUC: {c.ruc}</span>}
+                            {disabled && c.motivo_cancelacion && (
+                              <span className="text-red-700">
+                                Motivo: {c.motivo_cancelacion}
                               </span>
-                            </CardTitle>
-                          </CardHeader>
-                        </Card>
-                      ))}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Aún no hay resultados. Sube documentos y ejecuta el análisis.
+                            )}
+                          </div>
+                          {c.files.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {c.files.map((f) => (
+                                <FilePill key={f.id} name={f.name} />
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Analysis */}
+            <Card className="md:col-span-2">
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle>Resultado del análisis</CardTitle>
+                <Button
+                  size="sm"
+                  disabled={analyzing || !canAnalyze}
+                  onClick={async () => {
+                    if (!canAnalyze) {
+                      toast.error(
+                        "Para ejecutar el análisis, sube al menos 1 documento del pliego y 1 propuesta de algún oferente."
+                      );
+                      return;
+                    }
+                    try {
+                      setAnalyzing(true);
+                      toast.info("Ejecutando análisis...");
+                      await runAnalysis(project.id);
+                      toast.success("Análisis completado");
+                    } catch {
+                      toast.error("No se pudo obtener el análisis");
+                    } finally {
+                      setAnalyzing(false);
+                    }
+                  }}
+                >
+                  {analyzing ? "Analizando..." : "Obtener comparación"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {analyzing ? (
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-32" />
+                    ))}
+                  </div>
+                ) : project.analysis ? (
+                  <div className="space-y-4">
+                    <Tabs defaultValue="resumen">
+                      <TabsList>
+                        <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                        <TabsTrigger value="semaforo">
+                          Semaforización
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* Resumen: master-detail */}
+                      <TabsContent value="resumen">
+                        {(() => {
+                          const items = project.analysis!.comparison || [];
+                          if (!items.length) {
+                            return (
+                              <p className="text-sm text-muted-foreground mt-3">
+                                Sin resúmenes disponibles.
+                              </p>
+                            );
+                          }
+                          const active =
+                            items.find(
+                              (i) => i.documentId === selectedBidderId
+                            ) || items[0];
+                          const activeSummary =
+                            active.summary?.summary_text || "";
+                          return (
+                            <div className="mt-3 grid gap-4 md:grid-cols-[260px_1fr]">
+                              {/* Master list */}
+                              <Card className="h-full">
+                                <CardHeader className="py-3">
+                                  <CardTitle className="text-sm">
+                                    Oferentes ({items.length})
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                  <ul className="max-h-[360px] overflow-auto divide-y">
+                                    {items.map((i) => {
+                                      const isActive =
+                                        i.documentId === active.documentId;
+                                      return (
+                                        <li key={i.documentId}>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedBidderId(i.documentId)
+                                            }
+                                            className={cn(
+                                              "w-full text-left px-3 py-2 hover:bg-muted/70 focus:outline-none",
+                                              isActive && "bg-muted"
+                                            )}
+                                          >
+                                            <div className="flex items-center justify-between gap-3">
+                                              <span className="truncate text-sm font-medium">
+                                                {i.bidderName}
+                                              </span>
+                                              <Badge className="shrink-0 bg-primary text-primary-foreground">
+                                                {Math.round(i.overallScore)}
+                                              </Badge>
+                                            </div>
+                                          </button>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </CardContent>
+                              </Card>
+
+                              {/* Detail panel */}
+                              <Card>
+                                <CardHeader className="flex-row items-center justify-between gap-3">
+                                  <CardTitle className="text-base truncate flex items-center gap-2">
+                                    {active.bidderName}
+                                    <Badge className="bg-primary text-primary-foreground">
+                                      {Math.round(active.overallScore)}
+                                    </Badge>
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3 text-sm">
+                                  {activeSummary ? (
+                                    <p className="text-muted-foreground whitespace-pre-wrap">
+                                      {activeSummary}
+                                    </p>
+                                  ) : (
+                                    <p className="text-muted-foreground">
+                                      Sin resumen disponible.
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(
+                                            activeSummary
+                                          );
+                                          toast.success("Resumen copiado");
+                                        } catch {
+                                          toast.error(
+                                            "No se pudo copiar el resumen"
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      Copiar resumen
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          );
+                        })()}
+                      </TabsContent>
+
+                      {/* Semaforización */}
+                      <TabsContent value="semaforo">
+                        <div className="space-y-4">
+                          {(() => {
+                            const allAlerts =
+                              project.analysis!.comparison.flatMap(
+                                (c) => c.alerts || []
+                              );
+                            const g = allAlerts.filter(
+                              (a) => a.level === "green"
+                            ).length;
+                            const r = allAlerts.filter(
+                              (a) => a.level === "red"
+                            ).length;
+                            const y = allAlerts.filter(
+                              (a) => a.level === "yellow"
+                            ).length;
+                            return (
+                              <div className="text-sm text-muted-foreground">
+                                <span className="inline-flex items-center gap-2">
+                                  <span
+                                    className="inline-block h-2 w-2 rounded-full bg-green-500"
+                                    aria-hidden
+                                  />
+                                  Verdes:
+                                  <strong className="text-foreground">
+                                    {g}
+                                  </strong>
+                                </span>
+                                <span className="mx-3">·</span>
+                                <span className="inline-flex items-center gap-2">
+                                  <span
+                                    className="inline-block h-2 w-2 rounded-full bg-red-500"
+                                    aria-hidden
+                                  />
+                                  Rojas:
+                                  <strong className="text-foreground">
+                                    {r}
+                                  </strong>
+                                </span>
+                                <span className="mx-3">·</span>
+                                <span className="inline-flex items-center gap-2">
+                                  <span
+                                    className="inline-block h-2 w-2 rounded-full bg-yellow-500"
+                                    aria-hidden
+                                  />
+                                  Amarillas:
+                                  <strong className="text-foreground">
+                                    {y}
+                                  </strong>
+                                </span>
+                              </div>
+                            );
+                          })()}
+
+                          {project.analysis.comparison.map((it) => {
+                            const greens = (it.alerts || []).filter(
+                              (a) => a.level === "green"
+                            );
+                            const reds = (it.alerts || []).filter(
+                              (a) => a.level === "red"
+                            );
+                            const yellows = (it.alerts || []).filter(
+                              (a) => a.level === "yellow"
+                            );
+                            const order = ["green", "red", "yellow"] as const;
+                            const groups = {
+                              green: greens,
+                              red: reds,
+                              yellow: yellows,
+                            } as const;
+                            const counts = {
+                              green: greens.length,
+                              red: reds.length,
+                              yellow: yellows.length,
+                            };
+                            return (
+                              <Card key={it.documentId}>
+                                <CardHeader>
+                                  <CardTitle className="text-base flex items-center justify-between gap-3">
+                                    <span>{it.bidderName}</span>
+                                    <span className="text-xs text-muted-foreground inline-flex items-center gap-3">
+                                      <span className="inline-flex items-center gap-1">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full bg-green-500"
+                                          aria-hidden
+                                        />
+                                        {counts.green}
+                                      </span>
+                                      <span className="inline-flex items-center gap-1">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full bg-red-500"
+                                          aria-hidden
+                                        />
+                                        {counts.red}
+                                      </span>
+                                      <span className="inline-flex items-center gap-1">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full bg-yellow-500"
+                                          aria-hidden
+                                        />
+                                        {counts.yellow}
+                                      </span>
+                                    </span>
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-5">
+                                  {(it.alerts?.length || 0) === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                      Sin alertas.
+                                    </p>
+                                  ) : (
+                                    order.map(
+                                      (lvl) =>
+                                        groups[lvl].length > 0 && (
+                                          <CollapsibleSection
+                                            key={lvl}
+                                            title={
+                                              lvl === "green"
+                                                ? "Verdes"
+                                                : lvl === "red"
+                                                ? "Rojas"
+                                                : "Amarillas"
+                                            }
+                                            color={lvl}
+                                            count={groups[lvl].length}
+                                          >
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                              {groups[lvl].map((a, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className={cn(
+                                                    "rounded-md border bg-muted/40 p-3 text-sm hover:shadow-sm transition",
+                                                    lvl === "green" &&
+                                                      "border-l-4 border-l-green-500",
+                                                    lvl === "red" &&
+                                                      "border-l-4 border-l-red-500",
+                                                    lvl === "yellow" &&
+                                                      "border-l-4 border-l-yellow-500"
+                                                  )}
+                                                  title={`${a.area} — ${a.topic}`}
+                                                >
+                                                  <div className="text-xs text-muted-foreground mb-1">
+                                                    {a.area} — {a.topic}
+                                                  </div>
+                                                  <div className="text-foreground line-clamp-3">
+                                                    {a.message}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </CollapsibleSection>
+                                        )
+                                    )
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Aún no hay resultados. Sube documentos y ejecuta el
+                    análisis.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Etapa 2: placeholder */}
+        <TabsContent value="stage2" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Proceso de contratación
+                <Badge>En desarrollo</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Aquí podrás subir el contrato adjudicado (PDF) para su análisis
+                automático. Esta sección aún está en construcción.
               </p>
-            )}
-          </CardContent>
-        </Card>
+              <div className="rounded-md border bg-muted/40 p-4">
+                <Label htmlFor="contract-file" className="text-foreground">
+                  Subir contrato (próximamente)
+                </Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    id="contract-file"
+                    type="file"
+                    disabled
+                    className="hidden"
+                  />
+                  <Button variant="outline" size="sm" disabled>
+                    <Upload className="size-4 mr-2" /> Seleccionar PDF
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function AddContractorControls({
+  onAddByName,
+  onAddByRuc,
+}: {
+  onAddByName: (name: string) => void;
+  onAddByRuc: (ruc: string) => Promise<any>;
+}) {
+  const [name, setName] = useState("");
+  const [ruc, setRuc] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="grid gap-2">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Agregar oferente manualmente"
+          className="border-muted"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          size="sm"
+          disabled={!name.trim() || busy}
+          onClick={() => {
+            onAddByName(name.trim());
+            setName("");
+          }}
+        >
+          <Plus className="size-4 mr-1" /> Agregar
+        </Button>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          placeholder="Agregar por RUC (13 dígitos)"
+          className="border-muted"
+          value={ruc}
+          onChange={(e) => setRuc(e.target.value)}
+        />
+        <Button
+          size="sm"
+          disabled={!/^\d{13}$/.test(ruc) || busy}
+          onClick={async () => {
+            try {
+              setBusy(true);
+              await onAddByRuc(ruc);
+              setRuc("");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Validar RUC
+        </Button>
       </div>
     </div>
+  );
+}
+
+function FilePill({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center rounded-md border bg-muted/40 px-2 py-1 text-xs">
+      {name}
+    </span>
   );
 }
 
@@ -648,3 +856,5 @@ function CollapsibleSection({
     </div>
   );
 }
+
+// removed ExpandableText per latest UX update

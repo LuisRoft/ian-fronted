@@ -88,21 +88,20 @@ Antes de cargar una propuesta, el frontend debe validar el RUC del proponente.
   - Si un archivo falla (p. ej. no se puede leer), se registra el fallo para ese archivo y el proceso continúa con los siguientes.
 - **c. Responde a la UI:** Devuelve una lista de objetos JSON, uno por cada archivo, indicando el estado de cada uno.
 
-
-    ```json
-    [
-        {
-            "document_id": "pliego-parte1.pdf-a1b2c3d4",
-            "file_name": "pliego-parte1.pdf",
-            "status": "COMPLETED"
-        },
-        {
-            "document_id": null,
-            "file_name": "scan-ilegible.pdf",
-            "status": "FAILED: No se pudo extraer texto suficiente."
-        }
-    ]
-    ```
+  ```json
+  [
+    {
+      "document_id": "pliego-parte1.pdf-a1b2c3d4",
+      "file_name": "pliego-parte1.pdf",
+      "status": "COMPLETED"
+    },
+    {
+      "document_id": null,
+      "file_name": "scan-ilegible.pdf",
+      "status": "FAILED: No se pudo extraer texto suficiente."
+    }
+  ]
+  ```
 
 ### **Paso 3: Generación de Análisis y Comparativas (Síncrono)**
 
