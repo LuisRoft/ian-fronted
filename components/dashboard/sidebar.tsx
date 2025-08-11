@@ -4,8 +4,19 @@ import { useState } from "react";
 import { useProjects } from "@/components/dashboard/projects-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Folder } from "lucide-react";
+import { Plus, Folder, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Sidebar({
   activeId,
@@ -14,7 +25,7 @@ export default function Sidebar({
   activeId?: string;
   onSelect: (id: string) => void;
 }) {
-  const { projects, createProject } = useProjects();
+  const { projects, createProject, removeProject } = useProjects();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
@@ -60,15 +71,52 @@ export default function Sidebar({
             <div
               key={p.id}
               className={cn(
-                "group flex items-center justify-between gap-2 px-2 py-2 rounded-md text-sm cursor-pointer",
+                "group flex items-center justify-between gap-2 px-2 py-2 rounded-md text-sm",
                 activeId === p.id ? "bg-primary/10" : "hover:bg-muted"
               )}
-              onClick={() => onSelect(p.id)}
             >
-              <div className="flex items-center gap-2 truncate">
+              <button
+                type="button"
+                className="flex-1 flex items-center gap-2 truncate text-left"
+                onClick={() => onSelect(p.id)}
+              >
                 <Folder className="size-4 text-muted-foreground" />
                 <span className="truncate">{p.name}</span>
-              </div>
+              </button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100"
+                    title="Eliminar proyecto"
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminar proyecto</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      ¿Deseas eliminar "{p.name}" y todo su contenido? Se
+                      eliminará el workspace en el backend (ChromaDB
+                      collection). Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={async () => {
+                        await removeProject(p.id);
+                        if (activeId === p.id) onSelect("");
+                      }}
+                    >
+                      Eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ))
         )}

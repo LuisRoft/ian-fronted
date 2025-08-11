@@ -24,6 +24,29 @@ export type ComparisonResponse = {
     summary?: {
       compliance?: string;
       summary_text?: string;
+      by_topics?: Array<{
+        topic: string;
+        overallScore?: number;
+        summary?: { compliance?: string; summary_text?: string };
+        alerts?: Array<{
+          level: string;
+          area?: string;
+          topic?: string;
+          message: string;
+        }>;
+        evidence?: {
+          tender?: Array<{
+            file_name: string;
+            chunk_number?: number;
+            preview?: string;
+          }>;
+          proposal?: Array<{
+            file_name: string;
+            chunk_number?: number;
+            preview?: string;
+          }>;
+        };
+      }>;
     };
     ruc_validation?: {
       isValid: boolean;
@@ -128,6 +151,7 @@ export async function deleteProjectBackend(project_id: string): Promise<void> {
       method: "DELETE",
     }
   );
+  if (res.status === 404) return; // Treat as success/idempotent
   if (!res.ok) {
     const err: HttpError = Object.assign(new Error(`HTTP ${res.status}`), {
       status: res.status as number,

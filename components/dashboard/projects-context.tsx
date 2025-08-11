@@ -52,6 +52,7 @@ type ProjectsContextValue = {
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => void;
   deleteProjectRemote?: (id: string) => Promise<void>;
+  removeProject: (id: string) => Promise<void>;
   addContratanteFiles: (projectId: string, files: File[]) => void;
   addContractor: (projectId: string, name: string) => Contractor;
   addContractorByRuc: (projectId: string, ruc: string) => Promise<Contractor>;
@@ -164,6 +165,17 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       },
       deleteProject: (id: string) => {
         setProjects((arr) => arr.filter((p) => p.id !== id));
+      },
+      removeProject: async (id: string) => {
+        const proj = projects.find((p) => p.id === id);
+        // Optimistic local removal
+        setProjects((arr) => arr.filter((p) => p.id !== id));
+        if (!proj?.backend?.project_id) return;
+        try {
+          await apiDeleteProjectBackend(proj.backend.project_id);
+        } catch (e) {
+          console.warn("Failed to delete project in backend", e);
+        }
       },
       addContratanteFiles: (projectId: string, files: File[]) => {
         const metas: FileMeta[] = files.map((f) => ({

@@ -29,6 +29,8 @@ import {
   Plus,
   ChevronDown,
   Trash2,
+  FileText,
+  FileSignature,
 } from "lucide-react";
 
 type Props = { id: string };
@@ -592,36 +594,278 @@ export default function ProjectWorkspace({ id }: Props) {
                                     </Badge>
                                   </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3 text-sm">
+                                <CardContent className="space-y-4 text-sm">
                                   {activeSummary ? (
-                                    <p className="text-muted-foreground whitespace-pre-wrap">
-                                      {activeSummary}
-                                    </p>
+                                    <div>
+                                      <p className="text-muted-foreground whitespace-pre-wrap">
+                                        {activeSummary}
+                                      </p>
+                                      <div className="flex items-center gap-2 pt-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={async () => {
+                                            try {
+                                              await navigator.clipboard.writeText(
+                                                activeSummary
+                                              );
+                                              toast.success("Resumen copiado");
+                                            } catch {
+                                              toast.error(
+                                                "No se pudo copiar el resumen"
+                                              );
+                                            }
+                                          }}
+                                        >
+                                          Copiar resumen
+                                        </Button>
+                                      </div>
+                                    </div>
                                   ) : (
                                     <p className="text-muted-foreground">
                                       Sin resumen disponible.
                                     </p>
                                   )}
-                                  <div className="flex items-center gap-2 pt-1">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={async () => {
-                                        try {
-                                          await navigator.clipboard.writeText(
-                                            activeSummary
-                                          );
-                                          toast.success("Resumen copiado");
-                                        } catch {
-                                          toast.error(
-                                            "No se pudo copiar el resumen"
-                                          );
-                                        }
-                                      }}
-                                    >
-                                      Copiar resumen
-                                    </Button>
-                                  </div>
+
+                                  {(() => {
+                                    const topics =
+                                      active.summary?.by_topics || [];
+                                    if (!topics.length) return null;
+                                    return (
+                                      <div className="space-y-3">
+                                        <h4 className="text-sm font-medium">
+                                          Puntos clave por subtema
+                                        </h4>
+                                        <div className="grid gap-3">
+                                          {topics.map((t, idx) => {
+                                            const alerts = t.alerts || [];
+                                            const greens = alerts.filter(
+                                              (a) => a.level === "green"
+                                            ).length;
+                                            const reds = alerts.filter(
+                                              (a) => a.level === "red"
+                                            ).length;
+                                            const yellows = alerts.filter(
+                                              (a) => a.level === "yellow"
+                                            ).length;
+                                            const color =
+                                              reds > 0
+                                                ? "red"
+                                                : yellows > 0
+                                                ? "yellow"
+                                                : ("green" as const);
+                                            return (
+                                              <CollapsibleSection
+                                                key={`${t.topic}-${idx}`}
+                                                title={t.topic}
+                                                color={color}
+                                                count={alerts.length}
+                                                defaultOpen={false}
+                                              >
+                                                <div className="space-y-3">
+                                                  <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs text-muted-foreground inline-flex items-center gap-3">
+                                                      <span className="inline-flex items-center gap-1">
+                                                        <span
+                                                          className="inline-block h-2 w-2 rounded-full bg-green-500"
+                                                          aria-hidden
+                                                        />
+                                                        {greens}
+                                                      </span>
+                                                      <span className="inline-flex items-center gap-1">
+                                                        <span
+                                                          className="inline-block h-2 w-2 rounded-full bg-red-500"
+                                                          aria-hidden
+                                                        />
+                                                        {reds}
+                                                      </span>
+                                                      <span className="inline-flex items-center gap-1">
+                                                        <span
+                                                          className="inline-block h-2 w-2 rounded-full bg-yellow-500"
+                                                          aria-hidden
+                                                        />
+                                                        {yellows}
+                                                      </span>
+                                                    </div>
+                                                    {typeof t.overallScore ===
+                                                      "number" && (
+                                                      <Badge className="bg-primary text-primary-foreground">
+                                                        {Math.round(
+                                                          t.overallScore
+                                                        )}
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+
+                                                  {t.summary?.summary_text && (
+                                                    <p className="text-muted-foreground whitespace-pre-wrap">
+                                                      {t.summary.summary_text}
+                                                    </p>
+                                                  )}
+
+                                                  {alerts.length > 0 && (
+                                                    <div className="grid gap-2 sm:grid-cols-2">
+                                                      {alerts.map((a, i2) => (
+                                                        <div
+                                                          key={i2}
+                                                          className={cn(
+                                                            "rounded-md border bg-muted/40 p-3 text-xs",
+                                                            a.level ===
+                                                              "green" &&
+                                                              "border-l-4 border-l-green-500",
+                                                            a.level === "red" &&
+                                                              "border-l-4 border-l-red-500",
+                                                            a.level ===
+                                                              "yellow" &&
+                                                              "border-l-4 border-l-yellow-500"
+                                                          )}
+                                                          title={`${
+                                                            a.area || ""
+                                                          } ${
+                                                            a.topic
+                                                              ? `— ${a.topic}`
+                                                              : ""
+                                                          }`.trim()}
+                                                        >
+                                                          <div className="text-[11px] text-muted-foreground mb-1">
+                                                            {a.area}
+                                                            {a.topic
+                                                              ? ` — ${a.topic}`
+                                                              : ""}
+                                                          </div>
+                                                          <div className="text-foreground line-clamp-3">
+                                                            {a.message}
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+
+                                                  {(t.evidence?.tender
+                                                    ?.length ||
+                                                    t.evidence?.proposal
+                                                      ?.length) && (
+                                                    <div className="grid gap-3 md:grid-cols-2">
+                                                      {t.evidence?.tender && (
+                                                        <div>
+                                                          <div className="text-xs font-medium mb-1 inline-flex items-center gap-1">
+                                                            <FileText className="h-3.5 w-3.5" />{" "}
+                                                            Pliego
+                                                          </div>
+                                                          <ul className="space-y-2">
+                                                            {t.evidence.tender.map(
+                                                              (ev, i3) => (
+                                                                <li
+                                                                  key={`t-${i3}`}
+                                                                >
+                                                                  <div className="rounded-md border bg-muted/30 p-2">
+                                                                    <div className="text-xs text-foreground flex items-center gap-2">
+                                                                      <span
+                                                                        className="font-medium truncate"
+                                                                        title={
+                                                                          ev.file_name
+                                                                        }
+                                                                      >
+                                                                        {
+                                                                          ev.file_name
+                                                                        }
+                                                                      </span>
+                                                                      {typeof ev.chunk_number ===
+                                                                        "number" && (
+                                                                        <span className="ml-auto text-[11px] text-muted-foreground">
+                                                                          #{" "}
+                                                                          {
+                                                                            ev.chunk_number
+                                                                          }
+                                                                        </span>
+                                                                      )}
+                                                                    </div>
+                                                                    {ev.preview && (
+                                                                      <blockquote
+                                                                        className="mt-1 text-[11px] text-muted-foreground border-l pl-2 italic line-clamp-4"
+                                                                        title={
+                                                                          ev.preview
+                                                                        }
+                                                                      >
+                                                                        “
+                                                                        {
+                                                                          ev.preview
+                                                                        }
+                                                                        ”
+                                                                      </blockquote>
+                                                                    )}
+                                                                  </div>
+                                                                </li>
+                                                              )
+                                                            )}
+                                                          </ul>
+                                                        </div>
+                                                      )}
+                                                      {t.evidence?.proposal && (
+                                                        <div>
+                                                          <div className="text-xs font-medium mb-1 inline-flex items-center gap-1">
+                                                            <FileSignature className="h-3.5 w-3.5" />{" "}
+                                                            Propuesta
+                                                          </div>
+                                                          <ul className="space-y-2">
+                                                            {t.evidence.proposal.map(
+                                                              (ev, i4) => (
+                                                                <li
+                                                                  key={`p-${i4}`}
+                                                                >
+                                                                  <div className="rounded-md border bg-muted/30 p-2">
+                                                                    <div className="text-xs text-foreground flex items-center gap-2">
+                                                                      <span
+                                                                        className="font-medium truncate"
+                                                                        title={
+                                                                          ev.file_name
+                                                                        }
+                                                                      >
+                                                                        {
+                                                                          ev.file_name
+                                                                        }
+                                                                      </span>
+                                                                      {typeof ev.chunk_number ===
+                                                                        "number" && (
+                                                                        <span className="ml-auto text-[11px] text-muted-foreground">
+                                                                          #{" "}
+                                                                          {
+                                                                            ev.chunk_number
+                                                                          }
+                                                                        </span>
+                                                                      )}
+                                                                    </div>
+                                                                    {ev.preview && (
+                                                                      <blockquote
+                                                                        className="mt-1 text-[11px] text-muted-foreground border-l pl-2 italic line-clamp-4"
+                                                                        title={
+                                                                          ev.preview
+                                                                        }
+                                                                      >
+                                                                        “
+                                                                        {
+                                                                          ev.preview
+                                                                        }
+                                                                        ”
+                                                                      </blockquote>
+                                                                    )}
+                                                                  </div>
+                                                                </li>
+                                                              )
+                                                            )}
+                                                          </ul>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </CollapsibleSection>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </CardContent>
                               </Card>
                             </div>
@@ -1019,5 +1263,3 @@ function CollapsibleSection({
     </div>
   );
 }
-
-// removed ExpandableText per latest UX update
