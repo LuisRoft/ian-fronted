@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/dashboard-shell";

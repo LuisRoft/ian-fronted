@@ -40,12 +40,12 @@ export default function Header() {
         </Link>
         <nav className="flex items-center gap-2">
           <SignedOut>
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" forceRedirectUrl="/dashboard">
               <Button variant="outline" size="sm">
                 Entrar
               </Button>
             </SignInButton>
-            <SignUpButton mode="modal">
+            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
               <Button size="sm">Crear cuenta</Button>
             </SignUpButton>
           </SignedOut>
