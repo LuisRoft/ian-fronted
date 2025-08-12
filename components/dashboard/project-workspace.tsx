@@ -554,7 +554,14 @@ export default function ProjectWorkspace({ id }: Props) {
                     }
                   }}
                 >
-                  {analyzing ? "Analizando..." : "Obtener comparación"}
+                  {analyzing ? (
+                    "Analizando..."
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Play className="size-4" />
+                      Analizar Ahora
+                    </span>
+                  )}
                 </Button>
               </CardHeader>
               <CardContent>
