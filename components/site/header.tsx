@@ -8,18 +8,25 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
+import AppLogo from "@/app/assets/logo.png";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function Header() {
-  const [visible, setVisible] = useState(false);
+  const pathname = usePathname();
+  const [visible, setVisible] = useState<boolean>(pathname !== "/");
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 8);
+    const onScroll = () => setVisible(pathname !== "/" || window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [pathname]);
+
+  // Do not render the floating header on dashboard routes
+  if (pathname?.startsWith("/dashboard")) return null;
 
   return (
     <header className="fixed inset-x-0 top-4 z-50 transition-all duration-300 pointer-events-none">
@@ -32,9 +39,10 @@ export default function Header() {
       >
         <div className="h-12 md:h-14 rounded-full border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm flex items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span
-              className="inline-block h-6 w-6 rounded-md bg-primary"
-              aria-hidden
+            <Image
+              src={AppLogo}
+              alt="Logo"
+              className="object-contain h-6 w-6"
             />
             IAN
           </Link>
@@ -50,7 +58,7 @@ export default function Header() {
               </SignUpButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             </SignedIn>
           </nav>
         </div>

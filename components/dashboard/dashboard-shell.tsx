@@ -11,7 +11,7 @@ export default function DashboardShell() {
     <ProjectsProvider>
       <div className="flex">
         <Sidebar activeId={activeId} onSelect={setActiveId} />
-        <main className="flex-1 min-h-[calc(100svh-56px)]">
+        <main className="flex-1 min-h-screen">
           <ProjectWorkspace id={activeId || ""} />
         </main>
       </div>

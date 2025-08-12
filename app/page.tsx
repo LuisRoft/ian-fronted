@@ -14,6 +14,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Cells from "@/app/assets/image-of-cells.png";
 import Robots from "@/app/assets/robots-hero.svg";
+import AppLogo from "@/app/assets/logo.png";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -37,19 +38,21 @@ export default async function Home() {
 
         <div className="max-w-6xl mx-auto px-4 py-16 w-full pb-24 md:pb-32">
           <div className="flex flex-col items-center text-center gap-6">
-            <p className="text-sm font-semibold tracking-wide text-secondary">
-              Contractor
+            <p className="text-xl font-bold tracking-wide text-secondary flex items-center gap-2">
+              <Image
+                src={AppLogo}
+                alt="Logo"
+                className="object-contain h-10 w-10"
+              />
+              IAN
             </p>
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
               <span className="block bg-[linear-gradient(90deg,#FF3BFF_0%,#ECBFBF_38%,#5C24FF_76%,#D94FD5_100%)] bg-clip-text text-transparent">
-                Un revisor rápido
+                Demasiados documentos, muy poco tiempo
               </span>
-              <span className="block text-foreground mt-2">IAN</span>
             </h1>
-            <p className="text-muted-foreground text-base md:text-lg max-w-2xl">
-              Analiza riesgos, propuestas y contratos con precisión. Reduce
-              hasta un 60% el tiempo de revisión, evita riesgos costosos y toma
-              decisiones claras.
+            <p className="text-muted-foreground text-md md:text-2xl max-w-2xl">
+              Organiza y analiza tus licitaciones en minutos, no semanas.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
               {userId ? (
@@ -59,7 +62,7 @@ export default async function Home() {
               ) : (
                 <>
                   <SignUpButton mode="modal">
-                    <Button size="lg">Empezar Gratis</Button>
+                    <Button size="lg">Quiero verlo en acción</Button>
                   </SignUpButton>
                   <SignInButton mode="modal">
                     <Button size="lg" variant="outline">

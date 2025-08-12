@@ -31,6 +31,8 @@ import {
   Trash2,
   FileText,
   FileSignature,
+  Users,
+  Play,
 } from "lucide-react";
 
 type Props = { id: string };
@@ -81,6 +83,24 @@ export default function ProjectWorkspace({ id }: Props) {
   const hasBidderWithFiles =
     project.contractors?.some((c) => (c.files?.length || 0) > 0) || false;
   const canAnalyze = hasTender && hasBidderWithFiles;
+
+  const tenderCount = project.contratanteFiles?.length || 0;
+  const biddersCount = project.contractors?.length || 0;
+
+  async function handleRunAnalysis() {
+    if (!canAnalyze || analyzing) return;
+    setAnalyzing(true);
+    try {
+      await runAnalysis(project!.id);
+      toast.success("Análisis iniciado");
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "No se pudo iniciar el análisis";
+      toast.error(msg);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function handleTenderFiles(files: File[]) {
     const pdfs = files.filter((f) => f.type === "application/pdf");
@@ -140,14 +160,59 @@ export default function ProjectWorkspace({ id }: Props) {
   return (
     <div className="p-4">
       <Tabs defaultValue="stage1" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="stage1">
-            Etapa 1: Análisis de documentos
-          </TabsTrigger>
-          <TabsTrigger value="stage2">
-            Etapa 2: Proceso de contratación
-          </TabsTrigger>
-        </TabsList>
+        {/* Sticky sub-header */}
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base md:text-lg font-semibold tracking-tight">
+                {project.name || "Proyecto"}
+              </h2>
+              <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5">
+                  <FileText className="size-3" /> {tenderCount} pliego(s)
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5">
+                  <Users className="size-3" /> {biddersCount} oferente(s)
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleRunAnalysis}
+                disabled={!canAnalyze || analyzing}
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="size-4 mr-1 animate-spin" /> Analizando…
+                  </>
+                ) : (
+                  <>
+                    <Play className="size-4 mr-1" /> Analizar ahora
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabs segmented control */}
+          <div className="mt-3">
+            <TabsList className="rounded-xl bg-muted/50 p-1">
+              <TabsTrigger
+                value="stage1"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                Etapa 1: Análisis de documentos
+              </TabsTrigger>
+              <TabsTrigger
+                value="stage2"
+                className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                Etapa 2: Proceso de contratación
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
 
         {/* Etapa 1 */}
         <TabsContent value="stage1" className="mt-2">
@@ -223,8 +288,8 @@ export default function ProjectWorkspace({ id }: Props) {
                               Eliminar documento
                             </AlertDialogTitle>
                             <AlertDialogDescription>
-                              ¿Deseas eliminar &quot;{f.name}&quot;? Esta acción no se
-                              puede deshacer.
+                              ¿Deseas eliminar &quot;{f.name}&quot;? Esta acción
+                              no se puede deshacer.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -316,9 +381,9 @@ export default function ProjectWorkspace({ id }: Props) {
                                     Eliminar oferente
                                   </AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    ¿Seguro que deseas eliminar &quot;{c.name}&quot; y
-                                    todos sus documentos? Esta acción no se
-                                    puede deshacer.
+                                    ¿Seguro que deseas eliminar &quot;{c.name}
+                                    &quot; y todos sus documentos? Esta acción
+                                    no se puede deshacer.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -435,8 +500,9 @@ export default function ProjectWorkspace({ id }: Props) {
                                         Eliminar documento
                                       </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        ¿Deseas eliminar &quot;{f.name}&quot; de {c.name}?
-                                        Esta acción no se puede deshacer.
+                                        ¿Deseas eliminar &quot;{f.name}&quot; de{" "}
+                                        {c.name}? Esta acción no se puede
+                                        deshacer.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -1158,7 +1224,7 @@ function FilePill({
         type="button"
         title="Eliminar"
         className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted focus:outline-none"
-  onClick={onDelete}
+        onClick={onDelete}
       >
         <Trash2 className="size-3.5 text-muted-foreground" />
       </button>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import AppLogo from "@/app/assets/logo.png";
 import { useProjects } from "@/components/dashboard/projects-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { SignedIn, UserButton } from "@clerk/nextjs";
 
 export default function Sidebar({
   activeId,
@@ -30,7 +33,23 @@ export default function Sidebar({
   const [name, setName] = useState("");
 
   return (
-    <aside className="w-full md:w-64 shrink-0 border-r bg-muted/20 h-[calc(100svh-56px)] sticky top-14">
+    <aside className="w-full md:w-64 shrink-0 border-r bg-muted/20 h-screen md:h-[100svh]">
+      {/* Local dashboard header inside sidebar */}
+      <div className="sticky top-0 z-10 bg-muted/20 backdrop-blur supports-[backdrop-filter]:bg-muted/30 px-3 py-3 border-b">
+        <div className="h-11 rounded-xl border bg-background/80 shadow-sm flex items-center justify-between px-3">
+          <div className="flex items-center gap-2 font-semibold">
+            <Image
+              src={AppLogo}
+              alt="Logo"
+              className="h-8 w-8 object-contain"
+            />
+            IAN
+          </div>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+        </div>
+      </div>
       <div className="p-3 border-b">
         {creating ? (
           <form
@@ -61,7 +80,7 @@ export default function Sidebar({
           </Button>
         )}
       </div>
-      <nav className="p-2 space-y-1 overflow-auto h-[calc(100%-60px)]">
+      <nav className="p-2 space-y-1 overflow-auto h-[calc(100%-128px)]">
         {projects.length === 0 ? (
           <div className="text-xs text-muted-foreground p-3">
             Crea tu primer proyecto para comenzar
@@ -98,8 +117,8 @@ export default function Sidebar({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Eliminar proyecto</AlertDialogTitle>
                     <AlertDialogDescription>
-                      ¿Deseas eliminar &quot;{p.name}&quot; y todo su contenido? Se
-                      eliminará el workspace en el backend (ChromaDB
+                      ¿Deseas eliminar &quot;{p.name}&quot; y todo su contenido?
+                      Se eliminará el workspace en el backend (ChromaDB
                       collection). Esta acción no se puede deshacer.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
