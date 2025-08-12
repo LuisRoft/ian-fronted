@@ -176,23 +176,6 @@ export default function ProjectWorkspace({ id }: Props) {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={handleRunAnalysis}
-                disabled={!canAnalyze || analyzing}
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="size-4 mr-1 animate-spin" /> Analizando…
-                  </>
-                ) : (
-                  <>
-                    <Play className="size-4 mr-1" /> Analizar ahora
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
 
           {/* Tabs segmented control */}
