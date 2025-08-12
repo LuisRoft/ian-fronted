@@ -1,36 +1,8 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { auth } from "@clerk/nextjs/server";
-import Link from "next/link";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 
 export default async function Dashboard() {
-  const { userId } = await auth();
-  if (!userId) {
-    return (
-      <main className="max-w-3xl mx-auto px-4 py-20">
-        <h1 className="text-2xl font-semibold">Acceso restringido</h1>
-        <p className="text-muted-foreground mt-2">
-          Inicia sesión para continuar.
-        </p>
-        <div className="mt-6 flex gap-2">
-          <Link
-            href="/sign-in"
-            className="h-9 px-3 rounded-md border inline-flex items-center"
-          >
-            Entrar
-          </Link>
-          <Link
-            href="/sign-up"
-            className="h-9 px-3 rounded-md bg-primary text-primary-foreground inline-flex items-center"
-          >
-            Crear cuenta
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
   return <DashboardShell />;
 }
